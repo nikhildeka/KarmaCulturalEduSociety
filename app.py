@@ -411,27 +411,28 @@ def home():
         Owner: {owner}
         """
 
-        # ✅ Send email synchronously, not in a new thread
-        try:
-            msg = MIMEMultipart()
-            msg["From"] = EMAIL
-            msg["To"] = TO_EMAIL
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
+        # ✅ Send email in a separate thread to prevent timeouts
+        def send_email_async():
+            try:
+                msg = MIMEMultipart()
+                msg["From"] = EMAIL
+                msg["To"] = TO_EMAIL
+                msg["Subject"] = subject
+                msg.attach(MIMEText(body, "plain"))
 
-            server = smtplib.SMTP("smtp.gmail.com", 587)
-            server.starttls()
-            server.login(EMAIL, PASSWORD)
-            server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
-            server.quit()
-            
-            flash("✅ Affiliation request submitted successfully!", "success")
-            print("✅ Email sent successfully") # Keep for debugging
-            
-        except Exception as e:
-            flash(f"❌ Error sending email: {str(e)}", "error")
-            print("❌ Error sending email:", e) # Keep for debugging
+                server = smtplib.SMTP("smtp.gmail.com", 587)
+                server.starttls()
+                server.login(EMAIL, PASSWORD)
+                server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
+                server.quit()
+                print("✅ Email sent successfully in background")
+            except Exception as e:
+                print("❌ Error sending email:", e)
 
+        # Start the thread and then immediately redirect the user
+        threading.Thread(target=send_email_async).start()
+        
+        flash("✅ Affiliation request submitted successfully!", "success")
         return redirect(url_for("home"))
         
     # ✅ Carousel
