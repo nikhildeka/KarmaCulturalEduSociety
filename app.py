@@ -386,20 +386,9 @@ base_template = """
 </html>
 """
 
-@app.route("/", methods=["GET", "POST"])
-def home():
-    if request.method == "POST":
-        institution = request.form["institution"]
-        email = request.form["email"]
-        phone = request.form["phone"]
-        address = request.form["address"]
-        owner = request.form["owner"]
-        
-        # New server-side validation check
-        if not phone.isdigit() or len(phone) != 10:
-            flash("❌ Please enter a valid 10-digit phone number.", "error")
-            return redirect(url_for("home"))
-            
+def send_affiliation_email(institution, email, phone, address, owner):
+    """Send affiliation request email"""
+    try:
         subject = "New Affiliation Request"
         body = f"""
         📌 New Affiliation Request:
@@ -410,10 +399,10 @@ def home():
         Address: {address}
         Owner: {owner}
         """
-
-        # ✅ Send email in a separate thread to prevent timeouts
-def send_email_async():
-    try:
+        
+        print(f"📧 Starting email process...")
+        print(f"From: {EMAIL}, To: {TO_EMAIL}")
+        
         msg = MIMEMultipart()
         msg["From"] = EMAIL
         msg["To"] = TO_EMAIL
@@ -426,14 +415,35 @@ def send_email_async():
         server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
         server.quit()
         print("✅ Email sent successfully in background")
+        return True
     except Exception as e:
         print("❌ Error sending email:", e)
+        import traceback
+        traceback.print_exc()
+        return False
 
-# Start the thread and then immediately redirect the user
-threading.Thread(target=send_email_async).start()
-
-flash("✅ Affiliation request submitted successfully!", "success")
-return redirect(url_for("home"))
+@app.route("/", methods=["GET", "POST"])
+def home():
+    if request.method == "POST":
+        institution = request.form["institution"]
+        email = request.form["email"]
+        phone = request.form["phone"]
+        address = request.form["address"]
+        owner = request.form["owner"]
+        
+        # Validation
+        if not phone.isdigit() or len(phone) != 10:
+            flash("❌ Please enter a valid 10-digit phone number.", "error")
+            return redirect(url_for("home"))
+        
+        # Start email thread
+        threading.Thread(
+            target=send_affiliation_email, 
+            args=(institution, email, phone, address, owner)
+        ).start()
+        
+        flash("✅ Affiliation request submitted successfully!", "success")
+        return redirect(url_for("home"))
 
     # ✅ Carousel
     photo1 = url_for('static', filename='photo1.jpg')
