@@ -406,25 +406,30 @@ def home():
         Owner: {owner}
         """
 
-        try:
-            msg = MIMEMultipart()
-            msg["From"] = EMAIL
-            msg["To"] = TO_EMAIL
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
+        # Function to send email in a separate thread
+        def send_email():
+            try:
+                msg = MIMEMultipart()
+                msg["From"] = EMAIL
+                msg["To"] = TO_EMAIL
+                msg["Subject"] = subject
+                msg.attach(MIMEText(body, "plain"))
 
-            server = smtplib.SMTP("smtp.gmail.com", 587)
-            server.starttls()
-            server.login(EMAIL, PASSWORD)
-            server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
-            server.quit()
+                server = smtplib.SMTP("smtp.gmail.com", 587)
+                server.starttls()
+                server.login(EMAIL, PASSWORD)
+                server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
+                server.quit()
+                print("✅ Email sent successfully")
+            except Exception as e:
+                print("❌ Error sending email:", e)
 
-            flash("✅ Affiliation request submitted successfully!", "success")
-        except Exception as e:
-            flash(f"❌ Error sending email: {str(e)}", "error")
+        # Run email in background
+        threading.Thread(target=send_email).start()
 
+        flash("✅ Affiliation request submitted successfully!", "success")
         return redirect(url_for("home"))
-
+        
     # ✅ Carousel
     photo1 = url_for('static', filename='photo1.jpg')
     photo2 = url_for('static', filename='photo2.png')
