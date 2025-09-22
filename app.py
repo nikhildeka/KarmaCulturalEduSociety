@@ -394,7 +394,12 @@ def home():
         phone = request.form["phone"]
         address = request.form["address"]
         owner = request.form["owner"]
-
+        
+        # New server-side validation check
+        if not phone.isdigit() or len(phone) != 10:
+            flash("❌ Please enter a valid 10-digit phone number.", "error")
+            return redirect(url_for("home"))
+            
         subject = "New Affiliation Request"
         body = f"""
         📌 New Affiliation Request:
@@ -406,28 +411,27 @@ def home():
         Owner: {owner}
         """
 
-        # Function to send email in a separate thread
-        def send_email():
-            try:
-                msg = MIMEMultipart()
-                msg["From"] = EMAIL
-                msg["To"] = TO_EMAIL
-                msg["Subject"] = subject
-                msg.attach(MIMEText(body, "plain"))
+        # ✅ Send email synchronously, not in a new thread
+        try:
+            msg = MIMEMultipart()
+            msg["From"] = EMAIL
+            msg["To"] = TO_EMAIL
+            msg["Subject"] = subject
+            msg.attach(MIMEText(body, "plain"))
 
-                server = smtplib.SMTP("smtp.gmail.com", 587)
-                server.starttls()
-                server.login(EMAIL, PASSWORD)
-                server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
-                server.quit()
-                print("✅ Email sent successfully")
-            except Exception as e:
-                print("❌ Error sending email:", e)
+            server = smtplib.SMTP("smtp.gmail.com", 587)
+            server.starttls()
+            server.login(EMAIL, PASSWORD)
+            server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
+            server.quit()
+            
+            flash("✅ Affiliation request submitted successfully!", "success")
+            print("✅ Email sent successfully") # Keep for debugging
+            
+        except Exception as e:
+            flash(f"❌ Error sending email: {str(e)}", "error")
+            print("❌ Error sending email:", e) # Keep for debugging
 
-        # Run email in background
-        threading.Thread(target=send_email).start()
-
-        flash("✅ Affiliation request submitted successfully!", "success")
         return redirect(url_for("home"))
         
     # ✅ Carousel
