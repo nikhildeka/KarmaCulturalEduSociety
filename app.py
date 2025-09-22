@@ -491,7 +491,7 @@ def home():
                 <label for="email">Email * </label>
                 <input type="email" id="email" name="email" required>
                 <label for="phone">Phone Number * </label>
-                <input type="text" id="phone" name="phone" pattern="^\d{10}$" placeholder="Enter 10-digit number" required>
+                <input type="text" id="phone" name="phone" placeholder="Enter 10-digit number" required>
                 <label for="address">Address of Institution * </label>
                 <textarea id="address" name="address" rows="3" required></textarea>
                 <label for="owner">Name of Owner/Proprietor * </label>
