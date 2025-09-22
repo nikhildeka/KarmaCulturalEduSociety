@@ -491,7 +491,7 @@ def home():
                 <label for="email">Email * </label>
                 <input type="email" id="email" name="email" required>
                 <label for="phone">Phone Number * </label>
-                <input type="tel" id="phone" name="phone" pattern="[0-9]{10}" required>
+                <input type="text" id="phone" name="phone" pattern="^\d{10}$" placeholder="Enter 10-digit number" required>
                 <label for="address">Address of Institution * </label>
                 <textarea id="address" name="address" rows="3" required></textarea>
                 <label for="owner">Name of Owner/Proprietor * </label>
@@ -545,7 +545,7 @@ def contact():
             <img src="https://img.icons8.com/ios-filled/50/4169e1/phone.png">
             <p>Phone: 
                 <a href="tel:+918399058514">+91 8399058514</a> | 
-                <a href="tel:+919954765626">+91 9954765626</a>
+                <a href="tel:+919954765926">+91 9954765926</a>
             </p>
         </div>
         
