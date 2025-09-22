@@ -412,29 +412,29 @@ def home():
         """
 
         # ✅ Send email in a separate thread to prevent timeouts
-        def send_email_async():
-            try:
-                msg = MIMEMultipart()
-                msg["From"] = EMAIL
-                msg["To"] = TO_EMAIL
-                msg["Subject"] = subject
-                msg.attach(MIMEText(body, "plain"))
+def send_email_async():
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL
+        msg["To"] = TO_EMAIL
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
 
-                server = smtplib.SMTP("smtp.gmail.com", 587)
-                server.starttls()
-                server.login(EMAIL, PASSWORD)
-                server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
-                server.quit()
-                print("✅ Email sent successfully in background")
-            except Exception as e:
-                print("❌ Error sending email:", e)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(EMAIL, PASSWORD)
+        server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
+        server.quit()
+        print("✅ Email sent successfully in background")
+    except Exception as e:
+        print("❌ Error sending email:", e)
 
-        # Start the thread and then immediately redirect the user
-        threading.Thread(target=send_email_async).start()
-        
-        flash("✅ Affiliation request submitted successfully!", "success")
-        return redirect(url_for("home"))
-        
+# Start the thread and then immediately redirect the user
+threading.Thread(target=send_email_async).start()
+
+flash("✅ Affiliation request submitted successfully!", "success")
+return redirect(url_for("home"))
+
     # ✅ Carousel
     photo1 = url_for('static', filename='photo1.jpg')
     photo2 = url_for('static', filename='photo2.png')
