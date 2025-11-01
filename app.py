@@ -1,16 +1,175 @@
-from flask import Flask, render_template_string, url_for, request, redirect, flash
-import threading, smtplib, os
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from flask import Flask, render_template_string, url_for, request, redirect, flash, session
+import sqlite3, os
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey" # needed for flash messages
+app.secret_key = "supersecretkey"
 
-# ✅ Email Config
-EMAIL = os.getenv("MAIL_USERNAME")
-PASSWORD = os.getenv("MAIL_PASSWORD")
-TO_EMAIL = "karmaculturaledusociety@gmail.com"
+DB_FILE = "submissions.db"
 
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "karma")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changeme")
+
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            institution TEXT,
+            email TEXT,
+            phone TEXT,
+            address TEXT,
+            owner TEXT,
+            submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def save_submission(institution, email, phone, address, owner):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO submissions (institution, email, phone, address, owner)
+        VALUES (?, ?, ?, ?, ?)
+    """, (institution, email, phone, address, owner))
+    conn.commit()
+    conn.close()
+
+# ✅ Function to get all submissions
+def get_submissions():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row # This allows us to access columns by name
+    c = conn.cursor()
+    c.execute("SELECT * FROM submissions ORDER BY submitted_at DESC")
+    submissions = c.fetchall()
+    conn.close()
+    return submissions
+
+# ✅ Login Route
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session["logged_in"] = True
+            flash("Logged in successfully!", "success")
+            return redirect(url_for("admin"))
+        else:
+            flash("Invalid credentials. Please try again.", "error")
+            return redirect(url_for("login"))
+    
+    # Login page HTML
+    content = """
+    <div style="max-width:400px; margin:50px auto; padding:20px; background:white; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,0.1);">
+        <h2 style="text-align:center; color:#4169e1;">Admin Login</h2>
+        <form method="POST">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:5px;">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required style="width:100%; padding:10px; margin-bottom:20px; border:1px solid #ccc; border-radius:5px;">
+            <button type="submit" style="width:100%; padding:12px; background:#4169e1; color:white; border:none; border-radius:5px; cursor:pointer;">Login</button>
+        </form>
+    </div>
+    """
+    return render_template_string(base_template, title="Login", content=content)
+
+# ✅ Admin Dashboard Route
+@app.route("/admin")
+def admin():
+    if not session.get("logged_in"):
+        flash("You need to log in to view this page.", "error")
+        return redirect(url_for("login"))
+
+    submissions = get_submissions()
+    
+    table_rows = ""
+    if submissions:
+        for sub in submissions:
+            table_rows += f"""
+            <tr>
+                <td>{sub['id']}</td>
+                <td>{sub['institution']}</td>
+                <td>{sub['email']}</td>
+                <td>{sub['phone']}</td>
+                <td>{sub['address']}</td>
+                <td>{sub['owner']}</td>
+                <td>{sub['submitted_at']}</td>
+            </tr>
+            """
+    else:
+        table_rows = """
+            <tr>
+                <td colspan="7">No submissions yet.</td>
+            </tr>
+        """
+        
+    content = f"""
+    <div style="padding:20px;">
+        <h1 style="color:#4169e1;">Admin Dashboard</h1>
+        <p>Welcome, Admin! Here are the submitted requests.</p>
+
+        <!-- ✅ Search bar -->
+        <input type="text" id="searchInput" onkeyup="searchTable()" 
+               placeholder="Search by any field..." 
+               style="width:100%; padding:10px; margin:15px 0; border:1px solid #ccc; border-radius:5px;">
+
+        <div style="overflow-x:auto;">
+            <table id="submissionsTable" style="width:100%; border-collapse: collapse; margin-top:10px;">
+                <thead>
+                    <tr style="background-color:#4169e1; color:white;">
+                        <th style="padding:12px; text-align:left;">ID</th>
+                        <th style="padding:12px; text-align:left;">Institution</th>
+                        <th style="padding:12px; text-align:left;">Email</th>
+                        <th style="padding:12px; text-align:left;">Phone</th>
+                        <th style="padding:12px; text-align:left;">Address</th>
+                        <th style="padding:12px; text-align:left;">Owner</th>
+                        <th style="padding:12px; text-align:left;">Submitted At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {table_rows}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ✅ Search Script -->
+    <script>
+    function searchTable() {{
+        var input = document.getElementById("searchInput");
+        var filter = input.value.toLowerCase();
+        var table = document.getElementById("submissionsTable");
+        var trs = table.getElementsByTagName("tr");
+
+        for (var i = 1; i < trs.length; i++) {{
+            var tds = trs[i].getElementsByTagName("td");
+            var show = false;
+            for (var j = 0; j < tds.length; j++) {{
+                if (tds[j] && tds[j].innerText.toLowerCase().indexOf(filter) > -1) {{
+                    show = true;
+                    break;
+                }}
+            }}
+            trs[i].style.display = show ? "" : "none";
+        }}
+    }}
+    </script>
+    """
+    return render_template_string(base_template, title="Admin Dashboard", content=content)
+
+
+# ✅ Logout Route
+@app.route("/logout")
+def logout():
+    session.pop("logged_in", None)
+    flash("You have been logged out.", "success")
+    return redirect(url_for("home"))
+
+
+# The rest of your code remains the same...
 base_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -328,6 +487,13 @@ base_template = """
             <a href="{{ url_for('home') }}">Home</a>
             <a href="{{ url_for('about') }}">About Us</a>
             <a href="{{ url_for('contact') }}">Contact Us</a>
+            
+            {% if session.get("logged_in") %}
+                <a href="{{ url_for('admin') }}">Dashboard</a>
+                <a href="{{ url_for('logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Admin Login</a>
+            {% endif %}
         </nav>
     </header>
     <div class="notice-container">
@@ -386,42 +552,6 @@ base_template = """
 </html>
 """
 
-def send_affiliation_email(institution, email, phone, address, owner):
-    """Send affiliation request email"""
-    try:
-        subject = "New Affiliation Request"
-        body = f"""
-        📌 New Affiliation Request:
-
-        Institution: {institution}
-        Email: {email}
-        Phone: {phone}
-        Address: {address}
-        Owner: {owner}
-        """
-        
-        print(f"📧 Starting email process...")
-        print(f"From: {EMAIL}, To: {TO_EMAIL}")
-        
-        msg = MIMEMultipart()
-        msg["From"] = EMAIL
-        msg["To"] = TO_EMAIL
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
-
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(EMAIL, PASSWORD)
-        server.sendmail(EMAIL, TO_EMAIL, msg.as_string())
-        server.quit()
-        print("✅ Email sent successfully in background")
-        return True
-    except Exception as e:
-        print("❌ Error sending email:", e)
-        import traceback
-        traceback.print_exc()
-        return False
-
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "POST":
@@ -435,22 +565,16 @@ def home():
         if not phone.isdigit() or len(phone) != 10:
             flash("❌ Please enter a valid 10-digit phone number.", "error")
             return redirect(url_for("home"))
-        
-        # Start email thread
-        threading.Thread(
-            target=send_affiliation_email, 
-            args=(institution, email, phone, address, owner)
-        ).start()
+            
+        save_submission(institution, email, phone, address, owner)
         
         flash("✅ Affiliation request submitted successfully!", "success")
         return redirect(url_for("home"))
 
-    # ✅ Carousel
     photo1 = url_for('static', filename='photo1.jpg')
     photo2 = url_for('static', filename='photo2.png')
     photo3 = url_for('static', filename='photo3.png')
 
-    # ✅ Home Page Content
     content = f"""
     <div class="carousel" onmouseover="stopAutoSlide()" onmouseout="startAutoSlide()">
         <div class="carousel-images">
@@ -525,7 +649,10 @@ def home():
 
 @app.route("/about")
 def about():
-    content = """
+    nikhil_img = url_for('static', filename='nikhil.jpg')
+    shruti_img = url_for('static', filename='shrutidhara.jpg')
+
+    content = f"""
     <div class="content" style="padding:40px; background:white; border-radius:10px; box-shadow:0px 4px 10px rgba(0,0,0,0.1);">
         <h1 style="color:#4169e1;">About Us</h1>
         
@@ -545,7 +672,58 @@ def about():
         <h2 style="margin-top:20px; color:#333;">Our Commitment</h2>
         <p>With a growing network of affiliated academies, Karma Cultural Education Society is committed to empowering individuals and institutions 
         to carry forward the legacy of Indian art and culture with pride and excellence.</p>
+
+        <!-- ✅ Team Section -->
+        <div class="team-section">
+            <div class="team-member left">
+                <img src="{nikhil_img}" alt="Nikhil Deka">
+                <h3 style="color:#4169e1;">Nikhil Deka</h3>
+                <p>President</p>
+            </div>
+            <div class="team-member right">
+                <img src="{shruti_img}" alt="Shrutidhara Saikia">
+                <h3 style="color:#4169e1;">Shrutidhara Saikia</h3>
+                <p>General Secretary</p>
+            </div>
+        </div>
     </div>
+
+    <style>
+        .team-section {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-top: 40px;
+            flex-wrap: wrap;
+        }}
+        .team-member {{
+            text-align: center;
+            width: 45%;
+        }}
+        .team-member img {{
+            width: 100%;
+            max-width: 250px;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
+        }}
+        .team-member h3 {{
+            margin-top: 12px;
+        }}
+        .team-member p {{
+            margin-top: 4px;
+            font-size: 16px;
+            color: #555;
+        }}
+
+        /* ✅ Mobile */
+        @media (max-width: 768px) {{
+            .team-member {{
+                width: 100%;
+                margin-bottom: 20px;
+            }}
+        }}
+    </style>
     """
     return render_template_string(base_template, title="About Us", content=content)
 
@@ -571,7 +749,7 @@ def contact():
         
         <div class="contact-item">
             <img src="https://img.icons8.com/ios-filled/50/4169e1/marker.png">
-            <p>Address: Salbari, Guwahati, Assam</p>
+            <p>Address: Salbari, Noonmati, Guwahati, Assam</p>
         </div>
         
         <h2>Follow Us</h2>
@@ -650,6 +828,8 @@ def contact():
     """
     return render_template_string(base_template, title="Contact Us", content=content)
 
+
 if __name__ == "__main__":
+    init_db()  
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=False)
